@@ -44,8 +44,95 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from midiutil import MIDIFile
+
 from engine import generate, TuneGenResult
+from player import DURATION_PROFILES
 from player import Player
+
+
+# ---------------------------------------------------------------------------
+# MIDI constants
+# ---------------------------------------------------------------------------
+
+EXPORTS_DIR = Path("exports")
+
+# MIDI pitch for each scale note
+NOTE_TO_MIDI: dict[str, int] = {
+    "C4": 60, "D4": 62, "E4": 64, "F4": 65,
+    "G4": 67, "A4": 69, "B4": 71, "C5": 72,
+}
+
+# Tempo used to convert seconds -> beats  (120 BPM = 0.5 s per beat)
+MIDI_TEMPO       = 120
+SECONDS_PER_BEAT = 60 / MIDI_TEMPO   # 0.5 s
+
+
+def _seconds_to_beats(seconds: float) -> float:
+    return seconds / SECONDS_PER_BEAT
+
+
+# ---------------------------------------------------------------------------
+# MIDI exporter
+# ---------------------------------------------------------------------------
+
+def export_midi(
+    seed:      list[str],
+    steps:     list[dict],
+    timestamp: str,
+) -> Path:
+    """
+    Write the chain session to a MIDI file in exports/<timestamp>.mid.
+
+    Duration per note group mirrors the player duration profiles so the
+    MIDI sounds like what you heard during the session:
+      seed notes   -> INPUT  profile (0.5 s -> 1.0 beat)
+      each chain   -> the mode chosen for that group
+
+    Parameters
+    ----------
+    seed      : The original 3-note seed sequence.
+    steps     : session_steps list from run_chain (same data as JSON log).
+    timestamp : Shared with the session JSON so the two files match up.
+
+    Returns
+    -------
+    Path to the saved .mid file.
+    """
+    EXPORTS_DIR.mkdir(exist_ok=True)
+    filepath = EXPORTS_DIR / f"{timestamp}.mid"
+
+    midi = MIDIFile(1)           # single track
+    midi.addTempo(0, 0, MIDI_TEMPO)
+
+    track    = 0
+    channel  = 0
+    volume   = 100
+    position = 0.0   # current beat position
+
+    def write_notes(notes: list[str], mode: str) -> None:
+        nonlocal position
+        hold = DURATION_PROFILES.get(mode, DURATION_PROFILES["INPUT"])
+        duration_beats = _seconds_to_beats(hold)
+        for note in notes:
+            pitch = NOTE_TO_MIDI.get(note, 60)
+            midi.addNote(track, channel, pitch, position, duration_beats, volume)
+            position += duration_beats
+
+    # Write seed with INPUT timing
+    write_notes(seed, "INPUT")
+
+    # Write each chosen continuation with its mode timing
+    for step in steps:
+        chosen_mode  = step.get("chosen_mode")
+        chosen_notes = step.get("chosen_notes")
+        if chosen_notes and chosen_mode not in (None, "quit"):
+            write_notes(chosen_notes, chosen_mode.upper())
+
+    with open(filepath, "wb") as f:
+        midi.writeFile(f)
+
+    return filepath
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +146,7 @@ def save_session(
     seed:         list[str],
     steps:        list[dict],
     final_melody: list[str],
+    timestamp:    str,
 ) -> Path:
     """
     Save a chain session to sessions/<timestamp>.json and return the path.
@@ -88,11 +176,10 @@ def save_session(
     """
     SESSIONS_DIR.mkdir(exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    filepath  = SESSIONS_DIR / f"{timestamp}.json"
+    filepath = SESSIONS_DIR / f"{timestamp}.json"
 
     payload = {
-        "timestamp":    datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "timestamp":    timestamp,
         "seed":         seed,
         "steps":        steps,
         "final_melody": final_melody,
@@ -257,13 +344,25 @@ def run_chain(
     print(f"  {' -> '.join(all_notes)}")
     print(f"  -------------------------------------------------------------------\n")
 
-    # Save session
+    # Shared timestamp so session JSON and MIDI always match up
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+
+    # Save session JSON
     saved_path = save_session(
         seed         = seed,
         steps        = session_steps,
         final_melody = all_notes,
+        timestamp    = timestamp,
     )
-    print(f"  Session saved -> {saved_path}\n")
+    print(f"  Session saved  -> {saved_path}")
+
+    # Export MIDI
+    midi_path = export_midi(
+        seed      = seed,
+        steps     = session_steps,
+        timestamp = timestamp,
+    )
+    print(f"  MIDI exported  -> {midi_path}\n")
 
 
 # ---------------------------------------------------------------------------

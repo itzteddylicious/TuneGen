@@ -18,3 +18,7 @@ Thumbs.db
 # TuneGen session logs
 sessions/*
 !sessions/.gitkeep
+
+# TuneGen MIDI exports
+exports/*
+!exports/.gitkeep
