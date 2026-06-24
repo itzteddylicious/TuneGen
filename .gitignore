@@ -5,3 +5,20 @@ venv/
 # Python cache
 __pycache__/
 *.pyc
+
+# macOS system file
+.DS_Store
+
+# Windows system file (thumbnail cache)
+Thumbs.db
+
+# Backup files from editors
+*~
+
+# TuneGen session logs
+sessions/*
+!sessions/.gitkeep
+
+# TuneGen MIDI exports
+exports/*
+!exports/.gitkeep
