@@ -190,11 +190,15 @@ def _generate_safe(ctx: _MusicContext) -> list[str]:
         candidate      = _note_at(candidate_idx)
 
         if candidate not in ctx.chord_tones:
-            candidate = min(
+            nearest = min(
                 ctx.chord_tones,
                 key=lambda n: abs(SCALE_INDEX[n] - candidate_idx)
             )
-            candidate_idx = SCALE_INDEX[candidate]
+            prev_note = result[-1] if result else ctx.last_note
+            if nearest != prev_note:
+                candidate     = nearest
+                candidate_idx = SCALE_INDEX[candidate]
+            # else: keep the scale tone to avoid repeating
 
         result.append(candidate)
         cur       = candidate_idx
@@ -210,7 +214,11 @@ def _generate_safe(ctx: _MusicContext) -> list[str]:
 def _generate_creative(ctx: _MusicContext) -> list[str]:
     """
     Contour-driven skip table (±2–3 scale steps).
-    Alternates chord tones on even steps, non-chord tones on odd steps.
+    Even steps prefer chord tones; odd steps prefer non-chord tones.
+
+    Bug fix: chord-snapping is skipped when it would repeat the previous
+    note — the skip target is kept as-is instead, which is still a valid
+    C Major scale tone and produces better melodic variety.
     """
     non_chord = ctx.non_chord_tones
 
@@ -231,15 +239,27 @@ def _generate_creative(ctx: _MusicContext) -> list[str]:
         next_idx  = _clamp(cur + skip)
         next_note = _note_at(next_idx)
 
-        if i % 2 == 0 and next_note not in ctx.chord_tones:
-            next_note = min(ctx.chord_tones,
-                            key=lambda n: abs(SCALE_INDEX[n] - next_idx))
-            next_idx  = SCALE_INDEX[next_note]
+        # Reference note: whatever came before this step
+        prev_note = result[-1] if result else ctx.last_note
 
+        # Even steps — prefer a chord tone, but only snap if it won't repeat
+        if i % 2 == 0 and next_note not in ctx.chord_tones:
+            nearest_chord = min(
+                ctx.chord_tones,
+                key=lambda n: abs(SCALE_INDEX[n] - next_idx)
+            )
+            if nearest_chord != prev_note:
+                next_note = nearest_chord
+                next_idx  = SCALE_INDEX[next_note]
+            # else: keep the skip target — it's still in scale, just not a chord tone
+
+        # Odd steps — prefer a non-chord tone
         elif i % 2 == 1 and next_note in ctx.chord_tones and non_chord:
-            next_note = min(non_chord,
-                            key=lambda n: abs(SCALE_INDEX[n] - next_idx))
-            next_idx  = SCALE_INDEX[next_note]
+            next_note = min(
+                non_chord,
+                key=lambda n: abs(SCALE_INDEX[n] - next_idx)
+            )
+            next_idx = SCALE_INDEX[next_note]
 
         result.append(next_note)
         cur = next_idx
@@ -254,9 +274,17 @@ def _generate_creative(ctx: _MusicContext) -> list[str]:
 def _generate_unexpected(ctx: _MusicContext) -> list[str]:
     """
     Contrarian leap table — inverts the source contour direction.
-    Every note must be a non-chord scale degree.
+    Every note must be a non-chord scale degree with no repetitions.
+
+    Bug fix: the old offset walk could loop back to the same note when
+    large downward leaps clamped to the scale floor repeatedly.
+    Now we maintain a 'used' set and select from the remaining non-chord
+    pool, favouring notes in the leap direction when possible.
     """
-    non_chord = ctx.non_chord_tones or [C_MAJOR_SCALE[0], C_MAJOR_SCALE[-1]]
+    non_chord_sorted = sorted(
+        ctx.non_chord_tones or [C_MAJOR_SCALE[0], C_MAJOR_SCALE[-1]],
+        key=lambda n: SCALE_INDEX[n]
+    )
 
     contra = {
         "ascending":  [-3, -4, -2],
@@ -269,21 +297,35 @@ def _generate_unexpected(ctx: _MusicContext) -> list[str]:
     pattern = contra.get(ctx.contour, [-3, +4, -3])
 
     result: list[str] = []
+    used:   set[str]  = set()
     cur = ctx.last_index
 
     for leap in pattern:
         next_idx  = _clamp(cur + leap)
         next_note = _note_at(next_idx)
 
-        if next_note in ctx.chord_tones:
-            for offset in [1, -1, 2, -2, 3, -3]:
-                alt = _note_at(next_idx + offset)
-                if alt not in ctx.chord_tones:
-                    next_note = alt
-                    next_idx  = SCALE_INDEX[alt]
-                    break
+        # If the ideal target is a chord tone or already used, find a replacement
+        if next_note in ctx.chord_tones or next_note in used:
+            # Pool: unused non-chord tones; fall back to all non-chord if exhausted
+            pool = [n for n in non_chord_sorted if n not in used]
+            if not pool:
+                pool = non_chord_sorted
+
+            if leap < 0:
+                # Wanted to go down — pick the lowest available pool note
+                # that is still below current position if possible
+                below = [n for n in pool if SCALE_INDEX[n] < cur]
+                next_note = below[0] if below else pool[0]
+            else:
+                # Wanted to go up — pick the highest available pool note
+                # that is still above current position if possible
+                above = [n for n in pool if SCALE_INDEX[n] > cur]
+                next_note = above[-1] if above else pool[-1]
+
+            next_idx = SCALE_INDEX[next_note]
 
         result.append(next_note)
+        used.add(next_note)
         cur = next_idx
 
     return result

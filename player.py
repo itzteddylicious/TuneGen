@@ -8,24 +8,25 @@ Expected WAV file naming
 One file per note, named exactly after the note it represents:
 
     sounds/
-        C4.wav
-        D4.wav
-        E4.wav
-        F4.wav
-        G4.wav
-        A4.wav
-        B4.wav
-        C5.wav
-
-You can change the folder and the naming pattern via the constants below
-or by passing arguments to the Player constructor.
+        C4.wav  D4.wav  E4.wav  F4.wav
+        G4.wav  A4.wav  B4.wav  C5.wav
 
 Dependencies
 ------------
     pip install pygame
 
-pygame.mixer is used because it supports overlapping playback and
-precise per-note timing without requiring a heavy audio framework.
+How duration works
+------------------
+Each WAV file is 2–3 seconds long. We start playback then call stop()
+after our chosen hold time — giving us full control over note length
+without needing multiple files.
+
+Duration profiles (seconds per note)
+-------------------------------------
+  SAFE       — 1.0s  long, legato, calm and resolved
+  CREATIVE   — 0.6s  medium, flowing but varied
+  UNEXPECTED — 0.25s short, staccato, punchy contrast
+  INPUT      — 0.5s  neutral reference playback
 """
 
 from __future__ import annotations
@@ -41,12 +42,27 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Defaults — edit these to match your setup
+# Duration profiles — tweak these to taste
 # ---------------------------------------------------------------------------
 
-DEFAULT_SOUNDS_DIR: str = "sounds"   # folder that contains your WAV files
-DEFAULT_NOTE_DURATION: float = 0.5   # seconds each note is held before next
-DEFAULT_NOTE_GAP: float = 0.05       # silence between notes (seconds)
+# How long each note rings before the next one starts (seconds)
+DURATION_PROFILES: dict[str, float] = {
+    "INPUT":      0.50,
+    "SAFE":       1.00,
+    "CREATIVE":   0.60,
+    "UNEXPECTED": 0.25,
+}
+
+# Silence between notes — kept short so staccato still sounds tight
+GAP_PROFILES: dict[str, float] = {
+    "INPUT":      0.05,
+    "SAFE":       0.08,   # tiny breath between held notes
+    "CREATIVE":   0.06,
+    "UNEXPECTED": 0.10,   # punchy gap reinforces the staccato feel
+}
+
+DEFAULT_SOUNDS_DIR: str = "sounds"
+DEFAULT_EXTENSION:  str = ".wav"
 
 
 # ---------------------------------------------------------------------------
@@ -55,16 +71,12 @@ DEFAULT_NOTE_GAP: float = 0.05       # silence between notes (seconds)
 
 class Player:
     """
-    Loads WAV files for every note in C_MAJOR_SCALE and plays sequences.
+    Loads WAV files for every note in the C Major scale and plays sequences.
 
     Parameters
     ----------
     sounds_dir : str | Path
-        Directory containing one WAV file per note (e.g. ``sounds/C4.wav``).
-    note_duration : float
-        Seconds to wait before starting the next note.
-    note_gap : float
-        Extra silence inserted between notes for articulation.
+        Directory containing one WAV per note (e.g. ``sounds/C4.wav``).
     extension : str
         File extension of your audio files (default ``".wav"``).
     """
@@ -74,9 +86,7 @@ class Player:
     def __init__(
         self,
         sounds_dir: str | Path = DEFAULT_SOUNDS_DIR,
-        note_duration: float   = DEFAULT_NOTE_DURATION,
-        note_gap: float        = DEFAULT_NOTE_GAP,
-        extension: str         = ".wav",
+        extension:  str        = DEFAULT_EXTENSION,
     ) -> None:
         if not _PYGAME_AVAILABLE:
             raise ImportError(
@@ -84,10 +94,8 @@ class Player:
                 "Install it with:  pip install pygame"
             )
 
-        self.sounds_dir    = Path(sounds_dir)
-        self.note_duration = note_duration
-        self.note_gap      = note_gap
-        self.extension     = extension
+        self.sounds_dir = Path(sounds_dir)
+        self.extension  = extension
         self._sounds: dict[str, pygame.mixer.Sound] = {}
 
         pygame.mixer.init()
@@ -112,82 +120,99 @@ class Player:
             raise FileNotFoundError(
                 "The following WAV files were not found:\n"
                 + "\n".join(f"  {p}" for p in missing)
-                + f"\n\nMake sure your sounds folder is '{self.sounds_dir}' "
-                  f"and each file is named like 'C4.wav', 'D4.wav', etc."
+                + f"\n\nExpected folder: '{self.sounds_dir}'"
+                  f"\nExpected naming: C4.wav, D4.wav, ... C5.wav"
             )
 
     # ------------------------------------------------------------------
     # Playback
     # ------------------------------------------------------------------
 
-    def play_note(self, note: str) -> None:
-        """Play a single note and block for note_duration + note_gap."""
+    def play_note(self, note: str, mode: str = "INPUT") -> None:
+        """
+        Play a single note and block for the mode's hold duration + gap.
+
+        Parameters
+        ----------
+        note : str
+            Note name, e.g. ``"C4"``.
+        mode : str
+            One of ``"INPUT"``, ``"SAFE"``, ``"CREATIVE"``, ``"UNEXPECTED"``.
+            Controls how long the note rings and the gap after it.
+        """
         if note not in self._sounds:
             raise ValueError(
-                f"'{note}' has no loaded sound. "
-                f"Valid notes: {self.NOTES}"
+                f"'{note}' has no loaded sound. Valid notes: {self.NOTES}"
             )
-        self._sounds[note].play()
-        time.sleep(self.note_duration)
-        self._sounds[note].stop()
-        time.sleep(self.note_gap)
 
-    def play_sequence(self, notes: list[str], label: str = "") -> None:
+        hold = DURATION_PROFILES.get(mode, DURATION_PROFILES["INPUT"])
+        gap  = GAP_PROFILES.get(mode, GAP_PROFILES["INPUT"])
+
+        self._sounds[note].play()
+        time.sleep(hold)
+        self._sounds[note].stop()
+        time.sleep(gap)
+
+    def play_sequence(
+        self,
+        notes: list[str],
+        mode:  str = "INPUT",
+        label: str = "",
+    ) -> None:
         """
-        Play a list of notes one after another.
+        Play a list of notes one after another using the given mode's timing.
 
         Parameters
         ----------
         notes : list[str]
-            Note names to play (e.g. ``["C4", "E4", "G4"]``).
+            Note names to play.
+        mode : str
+            Duration profile — ``"SAFE"``, ``"CREATIVE"``, or ``"UNEXPECTED"``.
         label : str
-            Optional label printed to stdout before playback starts.
+            Optional label printed before playback.
         """
         if label:
-            print(f"  ♪  {label}: {' → '.join(notes)}")
+            hold = DURATION_PROFILES.get(mode, 0.5)
+            print(f"  ♪  {label:<12} ({hold}s/note) : {' → '.join(notes)}")
+
         for note in notes:
-            self.play_note(note)
+            self.play_note(note, mode=mode)
 
     def play_result(
         self,
-        result,                          # TuneGenResult from engine.py
-        play_input:    bool = True,
-        play_safe:     bool = True,
-        play_creative: bool = True,
+        result,                        # TuneGenResult from engine.py
+        play_input:      bool = True,
+        play_safe:       bool = True,
+        play_creative:   bool = True,
         play_unexpected: bool = True,
-        pause_between: float = 0.4,      # silence between sections
+        pause_between:   float = 0.5,  # silence between sections
     ) -> None:
         """
-        Convenience method: plays all (or selected) sections of a
-        TuneGenResult in order — input → SAFE → CREATIVE → UNEXPECTED.
+        Play all (or selected) sections of a TuneGenResult in order:
+        INPUT → SAFE → CREATIVE → UNEXPECTED.
+
+        Each section uses its own duration profile automatically.
 
         Parameters
         ----------
         result : TuneGenResult
-            The object returned by ``engine.generate()``.
-        play_input : bool
-            Whether to play the original input sequence first.
-        play_safe / play_creative / play_unexpected : bool
-            Toggle each continuation on or off.
+            Returned by ``engine.generate()``.
+        play_input / play_safe / play_creative / play_unexpected : bool
+            Toggle individual sections on or off.
         pause_between : float
-            Seconds of silence inserted between sections.
+            Seconds of silence between sections.
         """
         sections: list[tuple[str, list[str]]] = []
 
-        if play_input:
-            sections.append(("INPUT", result.input_sequence))
-        if play_safe:
-            sections.append(("SAFE", result.safe))
-        if play_creative:
-            sections.append(("CREATIVE", result.creative))
-        if play_unexpected:
-            sections.append(("UNEXPECTED", result.unexpected))
+        if play_input:      sections.append(("INPUT",      result.input_sequence))
+        if play_safe:       sections.append(("SAFE",       result.safe))
+        if play_creative:   sections.append(("CREATIVE",   result.creative))
+        if play_unexpected: sections.append(("UNEXPECTED", result.unexpected))
 
-        print(f"\n  Playing: {result.chord_detected} "
-              f"({result.contour} contour)\n")
+        print(f"\n  ► {result.chord_detected}  |  {result.contour} contour\n")
 
-        for label, notes in sections:
-            self.play_sequence(notes, label=label)
+        for mode, notes in sections:
+            self.play_sequence(notes, mode=mode, label=mode)
             time.sleep(pause_between)
 
     # ------------------------------------------------------------------

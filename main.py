@@ -5,10 +5,16 @@ Wires the engine and player together.
 
 Run modes
 ---------
-  python main.py               # plays all demo sequences with audio
-  python main.py --no-audio    # prints analysis only, no audio
-  python main.py --seq C4 E4 G4          # custom sequence with audio
-  python main.py --seq C4 E4 G4 --no-audio  # custom sequence, no audio
+  python main.py                            # plays all demo sequences with audio
+  python main.py --no-audio                 # prints analysis only, no audio
+  python main.py --seq C4 E4 G4            # custom sequence with audio
+  python main.py --seq C4 E4 G4 --no-audio # custom sequence, no audio
+
+Note timing per mode (edit DURATION_PROFILES in player.py to adjust)
+  INPUT      — 0.50s  neutral reference
+  SAFE       — 1.00s  long, legato
+  CREATIVE   — 0.60s  medium, flowing
+  UNEXPECTED — 0.25s  short, staccato
 
 Folder layout expected
 ----------------------
