@@ -18,6 +18,7 @@ Chain mode
     [S]afe  [C]reative  [U]nexpected  [Q]uit
   The chosen 3-note continuation becomes the next input.
   The loop stops when you type Q or the --max-chains limit is reached.
+  Every chain session is automatically saved to sessions/<timestamp>.json.
 
 Note timing per mode (edit DURATION_PROFILES in player.py to adjust)
   INPUT      — 0.50s  neutral reference
@@ -30,17 +31,77 @@ Folder layout expected
   tunegen/
     engine.py
     player.py
-    main.py        ← you are here
+    main.py        <- you are here
+    sessions/      <- auto-created, one JSON per chain session
     sounds/
       C4.wav  D4.wav  E4.wav  F4.wav
       G4.wav  A4.wav  B4.wav  C5.wav
 """
 
 import argparse
+import json
 import sys
+from datetime import datetime
+from pathlib import Path
 
 from engine import generate, TuneGenResult
 from player import Player
+
+
+# ---------------------------------------------------------------------------
+# Session logger
+# ---------------------------------------------------------------------------
+
+SESSIONS_DIR = Path("sessions")
+
+
+def save_session(
+    seed:         list[str],
+    steps:        list[dict],
+    final_melody: list[str],
+) -> Path:
+    """
+    Save a chain session to sessions/<timestamp>.json and return the path.
+
+    JSON structure
+    --------------
+    {
+      "timestamp": "2024-01-15T14:30:22",
+      "seed": ["C4", "E4", "G4"],
+      "steps": [
+        {
+          "step": 1,
+          "input": ["C4", "E4", "G4"],
+          "chord": "C_MAJOR",
+          "contour": "ascending",
+          "continuations": {
+            "safe":       ["A4", "G4", "C4"],
+            "creative":   ["B4", "A4", "G4"],
+            "unexpected": ["D4", "F4", "A4"]
+          },
+          "chosen_mode":  "creative",
+          "chosen_notes": ["B4", "A4", "G4"]
+        }
+      ],
+      "final_melody": ["C4", "E4", "G4", "B4", "A4", "G4"]
+    }
+    """
+    SESSIONS_DIR.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    filepath  = SESSIONS_DIR / f"{timestamp}.json"
+
+    payload = {
+        "timestamp":    datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "seed":         seed,
+        "steps":        steps,
+        "final_melody": final_melody,
+    }
+
+    with open(filepath, "w") as f:
+        json.dump(payload, f, indent=2)
+
+    return filepath
 
 
 # ---------------------------------------------------------------------------
@@ -50,35 +111,34 @@ from player import Player
 def display(result: TuneGenResult, chain_step: int = 0) -> None:
     bar = "─" * 52
     step_label = f"  Step {chain_step}" if chain_step > 0 else "  TuneGen — Rule-Based Music Generator"
-    print(f"\n{'═' * 52}")
+    print(f"\n{'=' * 52}")
     print(step_label)
-    print(f"{'═' * 52}")
-    print(f"  Input Sequence : {' → '.join(result.input_sequence)}")
+    print(f"{'=' * 52}")
+    print(f"  Input Sequence : {' -> '.join(result.input_sequence)}")
     print(f"  Chord Detected : {result.chord_detected}")
     print(f"  Chord Tones    : {', '.join(result.chord_tones)}")
     print(f"  Contour        : {result.contour}")
     print(f"  Avg Interval   : {result.avg_interval} scale steps")
     print(f"{bar}")
-    print(f"  SAFE        : {' → '.join(result.safe)}")
-    print(f"  CREATIVE    : {' → '.join(result.creative)}")
-    print(f"  UNEXPECTED  : {' → '.join(result.unexpected)}")
-    print(f"{'═' * 52}")
+    print(f"  SAFE        : {' -> '.join(result.safe)}")
+    print(f"  CREATIVE    : {' -> '.join(result.creative)}")
+    print(f"  UNEXPECTED  : {' -> '.join(result.unexpected)}")
+    print(f"{'=' * 52}")
 
 
 # ---------------------------------------------------------------------------
-# Chain history tracker
+# Chain history display
 # ---------------------------------------------------------------------------
 
 def display_chain_history(history: list[tuple[str, list[str]]]) -> None:
-    """Print the full melody built so far as a single line."""
     if not history:
         return
-    print("\n  ── Melody so far ──────────────────────────────────")
+    print("\n  -- Melody so far --------------------------------------------------")
     line_parts = []
     for mode, notes in history:
-        line_parts.append(f"[{mode[:1]}] {' → '.join(notes)}")
+        line_parts.append(f"[{mode[:1]}] {' -> '.join(notes)}")
     print("  " + "  |  ".join(line_parts))
-    print("  ────────────────────────────────────────────────────")
+    print("  -------------------------------------------------------------------")
 
 
 # ---------------------------------------------------------------------------
@@ -87,13 +147,10 @@ def display_chain_history(history: list[tuple[str, list[str]]]) -> None:
 
 VALID_CHOICES = {"s": "safe", "c": "creative", "u": "unexpected", "q": "quit"}
 
+
 def ask_chain_choice() -> str:
-    """
-    Prompt the user to pick a continuation mode.
-    Returns one of: 'safe', 'creative', 'unexpected', 'quit'.
-    """
     while True:
-        raw = input("\n  Chain into → [S]afe  [C]reative  [U]nexpected  [Q]uit : ").strip().lower()
+        raw = input("\n  Chain into -> [S]afe  [C]reative  [U]nexpected  [Q]uit : ").strip().lower()
         if raw in VALID_CHOICES:
             return VALID_CHOICES[raw]
         print("  Please enter S, C, U, or Q.")
@@ -112,26 +169,17 @@ def get_continuation(result: TuneGenResult, mode: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def run_chain(
-    seed: list[str],
+    seed:       list[str],
     max_chains: int,
-    audio: bool,
-    player: "Player | None" = None,
+    audio:      bool,
+    player=None,
 ) -> None:
-    """
-    Core chain loop — shared by audio and no-audio modes.
-
-    Parameters
-    ----------
-    seed       : Starting 3-note sequence.
-    max_chains : Hard stop after this many iterations.
-    audio      : Whether to play each result.
-    player     : Player instance (required when audio=True).
-    """
     current_seq = seed
     history: list[tuple[str, list[str]]] = []   # (mode_chosen, notes)
+    session_steps: list[dict] = []               # full data for JSON log
     step = 0
 
-    print(f"\n  Chain mode started — max {max_chains} steps. Type Q to stop early.\n")
+    print(f"\n  Chain mode started -- max {max_chains} steps. Type Q to stop early.\n")
 
     while step < max_chains:
         step += 1
@@ -145,24 +193,77 @@ def run_chain(
 
         if step == max_chains:
             print(f"\n  Reached max chains ({max_chains}). Stopping.")
+            # Record the final step with no choice made
+            session_steps.append({
+                "step":    step,
+                "input":   result.input_sequence,
+                "chord":   result.chord_detected,
+                "contour": result.contour,
+                "continuations": {
+                    "safe":       result.safe,
+                    "creative":   result.creative,
+                    "unexpected": result.unexpected,
+                },
+                "chosen_mode":  None,
+                "chosen_notes": None,
+            })
             break
 
         choice = ask_chain_choice()
+
         if choice == "quit":
             print("\n  Stopped by user.")
+            session_steps.append({
+                "step":    step,
+                "input":   result.input_sequence,
+                "chord":   result.chord_detected,
+                "contour": result.contour,
+                "continuations": {
+                    "safe":       result.safe,
+                    "creative":   result.creative,
+                    "unexpected": result.unexpected,
+                },
+                "chosen_mode":  "quit",
+                "chosen_notes": None,
+            })
             break
 
         chosen_notes = get_continuation(result, choice)
+
+        session_steps.append({
+            "step":    step,
+            "input":   result.input_sequence,
+            "chord":   result.chord_detected,
+            "contour": result.contour,
+            "continuations": {
+                "safe":       result.safe,
+                "creative":   result.creative,
+                "unexpected": result.unexpected,
+            },
+            "chosen_mode":  choice,
+            "chosen_notes": chosen_notes,
+        })
+
         history.append((choice.upper(), chosen_notes))
         current_seq = chosen_notes
 
-    # Final summary
-    print(f"\n  ── Final melody ({len(history)} chain(s) completed) ─────────")
+    # Build final melody
     all_notes = list(seed)
     for _, notes in history:
         all_notes.extend(notes)
-    print(f"  {' → '.join(all_notes)}")
-    print(f"  ────────────────────────────────────────────────────\n")
+
+    # Final summary
+    print(f"\n  -- Final melody ({len(history)} chain(s) completed) ----------------")
+    print(f"  {' -> '.join(all_notes)}")
+    print(f"  -------------------------------------------------------------------\n")
+
+    # Save session
+    saved_path = save_session(
+        seed         = seed,
+        steps        = session_steps,
+        final_melody = all_notes,
+    )
+    print(f"  Session saved -> {saved_path}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +282,7 @@ DEMO_SEQUENCES: list[tuple[str, list[str]]] = [
 ]
 
 
-def run_demo(audio: bool, player: "Player | None") -> None:
+def run_demo(audio: bool, player=None) -> None:
     for label, seq in DEMO_SEQUENCES:
         print(f"\n>>> {label}")
         result = generate(seq)
@@ -196,13 +297,13 @@ def run_demo(audio: bool, player: "Player | None") -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="TuneGen — Rule-Based Music Generator"
+        description="TuneGen -- Rule-Based Music Generator"
     )
     parser.add_argument(
         "--seq",
         nargs=3,
         metavar=("NOTE1", "NOTE2", "NOTE3"),
-        help="Seed sequence for chain mode, e.g. --seq C4 E4 G4",
+        help="Seed sequence, e.g. --seq C4 E4 G4",
     )
     parser.add_argument(
         "--chain",
@@ -227,7 +328,6 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    # Validate chain requires --seq
     if args.chain and not args.seq:
         print("[Error] --chain requires a seed sequence. Use --seq NOTE1 NOTE2 NOTE3.")
         sys.exit(1)

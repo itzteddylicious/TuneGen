@@ -14,3 +14,7 @@ Thumbs.db
 
 # Backup files from editors
 *~
+
+# TuneGen session logs
+sessions/*
+!sessions/.gitkeep
