@@ -22,3 +22,9 @@ legacy/sessions/*
 # TuneGen MIDI exports
 legacy/exports/*
 !legacy/exports/.gitkeep
+
+# Dataset
+core/giantmidi-piano-unzipped-midi-v1.21-clean/
+
+# Preprocessed data
+core/data/
