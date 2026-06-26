@@ -22,3 +22,15 @@ legacy/sessions/*
 # TuneGen MIDI exports
 legacy/exports/*
 !legacy/exports/.gitkeep
+
+# Dataset
+core/giantmidi/
+
+# Preprocessed data
+core/data/
+
+# Model checkpoints
+core/checkpoints/
+
+# Editor
+.vscode/
