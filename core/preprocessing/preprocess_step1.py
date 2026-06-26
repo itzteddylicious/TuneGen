@@ -39,7 +39,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 # Config
 # ---------------------------------------------------------------------------
 
-DATASET_DIR  = Path("../giantmidi-piano-unzipped-midi-v1.21-clean")
+DATASET_DIR = Path("../giantmidi")
 OUTPUT_DIR   = Path("../data")
 OUTPUT_NPZ   = OUTPUT_DIR / "pitch_sequences.npz"
 OUTPUT_STATS = OUTPUT_DIR / "step1_stats.txt"

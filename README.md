@@ -1,32 +1,58 @@
 # TuneGen
 
-TuneGen is a rule-based musical co-creator that helps musicians find their next idea.
+TuneGen is an AI-assisted musical co-creator that helps musicians find their next idea.
 
-You play a short sequence of notes. TuneGen listens, understands the musical context, and offers you three different directions to go next — each with a different intention.
+You play a sequence of notes. TuneGen listens, understands the musical context, and suggests where the music could go next — not as a single answer, but as multiple possibilities with different intentions.
+
+It is not a music generator. It does not compose for you.
+It is a thinking tool — something to push back against, react to, and build with.
 
 ---
 
 ## How it works
 
-Give TuneGen a 3-note sequence and it responds with three continuations:
+Give TuneGen a sequence of notes and it responds with suggestions for what could come next. Each suggestion represents a different musical intention — staying close to the harmony, departing from it, or introducing contrast and surprise.
 
-- **SAFE** — a stable, resolved continuation that stays close to the harmony
-- **CREATIVE** — a more adventurous idea that still feels connected
-- **UNEXPECTED** — a contrasting response that challenges where you were heading
-
-You pick one, and TuneGen continues from there. The result is a melody built through a series of musical decisions — yours and the system's together.
+You decide which direction to follow. TuneGen continues from there.
 
 ---
 
-## What it is not
+## Project structure
 
-TuneGen is not a music generator. It does not compose for you.
-It is a thinking tool — something to push back against, react to, and build with.
+```
+TuneGen/
+  core/       — ML-based system (current development)
+  legacy/     — Rule-based prototype (reference implementation)
+```
+
+### core
+The main system. Built on an LSTM model trained on the GiantMIDI-Piano dataset — 10,841 classical piano performances by 2,786 composers. The model learns harmonic and melodic patterns from real human performances rather than predefined rules.
+
+### legacy
+The original rule-based prototype. Operates within the C Major scale and uses deterministic musical rules to generate three continuations — SAFE, CREATIVE, and UNEXPECTED. Kept as a reference implementation and proof of concept.
 
 ---
 
-## Current version
+## Dataset
 
-This is an early working version of the core system. It operates within the C Major scale and supports interactive chain sessions with audio playback, session logging, and MIDI export.
+This project uses the GiantMIDI-Piano dataset by ByteDance, released under the Apache 2.0 license.
 
-The full project is still in development.
+- GitHub: https://github.com/bytedance/GiantMIDI-Piano
+- 10,855 MIDI files, 1,237 hours of classical piano music
+
+Download the MIDI files and place them in:
+```
+core/giantmidi/
+```
+
+---
+
+## Status
+
+The project is in active development. The core ML model is functional and producing musically meaningful suggestions. Further training, evaluation, and refinement are ongoing.
+
+---
+
+## License
+
+Proprietary. See [LICENSE](LICENSE) for details.
