@@ -44,12 +44,10 @@ DATA_DIR         = Path("data")
 CHECKPOINT_DIR   = Path("checkpoints")
 
 BATCH_SIZE       = 512
-EPOCHS           = 10
+EPOCHS           = 3
 LEARNING_RATE    = 0.001
 GRAD_CLIP        = 1.0        # gradient clipping to prevent exploding gradients
-
-# How often to print progress within an epoch (every N batches)
-LOG_INTERVAL     = 500
+SAMPLE_RATIO     = 0.20       # fraction of training data to use
 
 
 # ---------------------------------------------------------------------------
@@ -81,14 +79,25 @@ class NoteSequenceDataset(Dataset):
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_split(filename: str) -> NoteSequenceDataset:
+def load_split(filename: str, sample_ratio: float = 1.0) -> NoteSequenceDataset:
     path = DATA_DIR / filename
     if not path.exists():
         raise FileNotFoundError(
             f"'{path}' not found. Run the preprocessing scripts first."
         )
-    data = np.load(path)
-    return NoteSequenceDataset(data["inputs"], data["outputs"])
+    data    = np.load(path)
+    inputs  = data["inputs"]
+    outputs = data["outputs"]
+
+    if sample_ratio < 1.0:
+        n          = int(len(inputs) * sample_ratio)
+        rng        = np.random.default_rng(42)
+        indices    = rng.choice(len(inputs), size=n, replace=False)
+        inputs     = inputs[indices]
+        outputs    = outputs[indices]
+        print(f"  Sampled {n:,} / {len(data['inputs']):,} pairs ({sample_ratio*100:.0f}%)")
+
+    return NoteSequenceDataset(inputs, outputs)
 
 
 # ---------------------------------------------------------------------------
@@ -122,12 +131,6 @@ def train_epoch(
 
         optimizer.step()
         total_loss += loss.item()
-
-        if batch_idx % LOG_INTERVAL == 0:
-            elapsed  = time.time() - start_time
-            avg_loss = total_loss / batch_idx
-            print(f"  Epoch {epoch} | Batch {batch_idx}/{len(loader)} "
-                  f"| Loss {avg_loss:.4f} | {elapsed:.1f}s elapsed")
 
     return total_loss / len(loader)
 
@@ -170,7 +173,7 @@ def main() -> None:
     # Data
     # ------------------------------------------------------------------
     print("\n  Loading data...")
-    train_dataset = load_split("train.npz")
+    train_dataset = load_split("train.npz", sample_ratio=SAMPLE_RATIO)
     val_dataset   = load_split("val.npz")
 
     train_loader  = DataLoader(
