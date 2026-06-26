@@ -1,8 +1,6 @@
-Copyright (c) 2026 TuneGen. All rights reserved.
+Copyright (c) 2026 Yash Firke. All rights reserved.
 
-This software and its source code are proprietary and confidential. Unauthorized copying, modification, distribution, or use of this software, in whole or in part, is strictly prohibited without the express written permission of the author.
-
-This license applies to all files in this repository including but not limited to the engine, player, and any associated logic or configuration files.
+This software, including its source code, models, algorithms, and all associated files, is proprietary and confidential. Unauthorized copying, modification, distribution, or use of this software, in whole or in part, is strictly prohibited without the express written permission of the author.
 
 ---
 
@@ -18,14 +16,21 @@ You may not:
 - Copy, reproduce, or duplicate any part of this codebase
 - Modify or create derivative works based on this software
 - Distribute, publish, or share this software or any portion of it
-- Use this software or any part of it in any commercial or non-commercial product
-- Reverse engineer or attempt to extract the underlying logic for use elsewhere
+- Use this software, its models, or any part of it in any commercial or non-commercial product without explicit written permission
+- Reverse engineer or attempt to extract the underlying logic, model weights, or training methodology for use elsewhere
+- Use the trained models or datasets produced by this system without permission
+
+---
+
+THIRD-PARTY DATASETS
+
+This project is trained on the GiantMIDI-Piano dataset by ByteDance, released under the Apache 2.0 license. The dataset itself is not owned by the author and is subject to its own license terms. This proprietary license applies only to the software, models, and original work authored in this repository.
 
 ---
 
 FUTURE RELEASES
 
-The author reserves the right to release selected components of this project — such as trained models or designated open-source modules — under separate licenses at their sole discretion. Such releases will be governed by their own license terms and do not affect the restrictions above.
+The author reserves the right to release selected components of this project — such as trained models, APIs, or designated open-source modules — under separate licenses at their sole discretion. Such releases will be governed by their own license terms and do not affect the restrictions above.
 
 ---
 
@@ -35,4 +40,7 @@ This software is provided as-is, without warranty of any kind, express or implie
 
 ---
 
-For permissions or inquiries, contact the author directly.
+CONTACT
+
+For permissions, licensing inquiries, or collaboration:
+yashfirke0708@gmail.com
