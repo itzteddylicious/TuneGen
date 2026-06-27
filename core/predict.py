@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from model import TuneGenLSTM
+from model import TuneGenTransformer
 
 
 # ---------------------------------------------------------------------------
@@ -89,14 +89,14 @@ def midi_to_note(midi: int) -> str:
 # Model loading
 # ---------------------------------------------------------------------------
 
-def load_model(device: torch.device) -> TuneGenLSTM:
+def load_model(device: torch.device) -> TuneGenTransformer:
     if not CHECKPOINT_PATH.exists():
         raise FileNotFoundError(
             f"Checkpoint not found at '{CHECKPOINT_PATH}'.\n"
             f"Make sure best_model.pt is inside core/checkpoints/."
         )
 
-    model = TuneGenLSTM().to(device)
+    model = TuneGenTransformer().to(device)
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
@@ -113,7 +113,7 @@ def load_model(device: torch.device) -> TuneGenLSTM:
 # ---------------------------------------------------------------------------
 
 def predict_next_notes(
-    model:       TuneGenLSTM,
+    model:       TuneGenTransformer,
     seed_seq:    list[int],
     steps:       int,
     device:      torch.device,
@@ -124,7 +124,7 @@ def predict_next_notes(
 
     Parameters
     ----------
-    model    : Trained TuneGenLSTM
+    model    : Trained TuneGenTransformer
     seed_seq : List of MIDI pitch integers (at least SEQUENCE_LENGTH long)
     steps    : Number of notes to predict
     device   : torch.device
@@ -142,7 +142,7 @@ def predict_next_notes(
     with torch.no_grad():
         for _ in range(steps):
             x      = torch.tensor([context], dtype=torch.long).to(device)
-            logits, _ = model(x)
+            logits    = model(x)
 
             # Sample from probability distribution with temperature
             # Temperature > 1.0 = more random, < 1.0 = more conservative

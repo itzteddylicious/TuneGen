@@ -38,7 +38,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
-from model import TuneGenLSTM
+from model import TuneGenTransformer
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ class NoteSequenceDataset(Dataset):
 # ---------------------------------------------------------------------------
 
 def evaluate(
-    model:     TuneGenLSTM,
+    model:     TuneGenTransformer,
     loader:    DataLoader,
     criterion: nn.CrossEntropyLoss,
     device:    torch.device,
@@ -97,7 +97,7 @@ def evaluate(
             inputs  = inputs.to(device)
             targets = targets.to(device)
 
-            logits, _ = model(inputs)
+            logits    = model(inputs)
             loss      = criterion(logits, targets)
             total_loss += loss.item()
 
@@ -137,7 +137,7 @@ def main() -> None:
         print(f"[Error] Checkpoint not found at '{CHECKPOINT_PATH}'.")
         return
 
-    model = TuneGenLSTM().to(device)
+    model = TuneGenTransformer().to(device)
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
 

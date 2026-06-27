@@ -1,7 +1,7 @@
 """
 train.py — TuneGen LSTM Training Loop
 =======================================
-Trains the TuneGenLSTM model on preprocessed GiantMIDI data.
+Trains the TuneGenTransformer model on preprocessed GiantMIDI data.
 
 What this script does
 ---------------------
@@ -33,7 +33,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
-from model import TuneGenLSTM
+from model import TuneGenTransformer
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ def load_split(filename: str, sample_ratio: float = 1.0) -> NoteSequenceDataset:
 # ---------------------------------------------------------------------------
 
 def train_epoch(
-    model:      TuneGenLSTM,
+    model:      TuneGenTransformer,
     loader:     DataLoader,
     criterion:  nn.CrossEntropyLoss,
     optimizer:  torch.optim.Adam,
@@ -122,8 +122,8 @@ def train_epoch(
         targets = targets.to(device)
 
         optimizer.zero_grad()
-        logits, _ = model(inputs)
-        loss      = criterion(logits, targets)
+        logits = model(inputs)
+        loss   = criterion(logits, targets)
         loss.backward()
 
         # Gradient clipping
@@ -136,7 +136,7 @@ def train_epoch(
 
 
 def validate(
-    model:     TuneGenLSTM,
+    model:     TuneGenTransformer,
     loader:    DataLoader,
     criterion: nn.CrossEntropyLoss,
     device:    torch.device,
@@ -149,8 +149,8 @@ def validate(
         for inputs, targets in loader:
             inputs  = inputs.to(device)
             targets = targets.to(device)
-            logits, _ = model(inputs)
-            loss      = criterion(logits, targets)
+            logits = model(inputs)
+            loss   = criterion(logits, targets)
             total_loss += loss.item()
 
     return total_loss / len(loader)
@@ -196,7 +196,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Model
     # ------------------------------------------------------------------
-    model     = TuneGenLSTM().to(device)
+    model     = TuneGenTransformer().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
