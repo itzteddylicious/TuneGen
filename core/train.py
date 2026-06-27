@@ -44,7 +44,7 @@ DATA_DIR         = Path("data")
 CHECKPOINT_DIR   = Path("checkpoints")
 
 BATCH_SIZE       = 512
-EPOCHS           = 3
+EPOCHS           = 5
 LEARNING_RATE    = 0.001
 GRAD_CLIP        = 1.0        # gradient clipping to prevent exploding gradients
 SAMPLE_RATIO     = 0.20       # fraction of training data to use
@@ -201,17 +201,41 @@ def main() -> None:
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     total_params = sum(p.numel() for p in model.parameters())
-    print(f"  Parameters    : {total_params:,}\n")
+    print(f"  Parameters    : {total_params:,}")
+
+    # ------------------------------------------------------------------
+    # Resume from checkpoint if available
+    # ------------------------------------------------------------------
+    start_epoch   = 1
+    best_val_loss = float("inf")
+    log_lines     = ["epoch,train_loss,val_loss,time_s\n"]
+
+    checkpoint_path = CHECKPOINT_DIR / "best_model.pt"
+    if checkpoint_path.exists():
+        print(f"\n  Resuming from checkpoint: {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        best_val_loss = checkpoint["val_loss"]
+        start_epoch   = checkpoint["epoch"] + 1
+        print(f"  Resumed from epoch {checkpoint['epoch']} "
+              f"(val loss: {best_val_loss:.4f})")
+    else:
+        print("\n  No checkpoint found — starting from scratch.")
+
+    remaining_epochs = EPOCHS - (start_epoch - 1)
+    if remaining_epochs <= 0:
+        print(f"\n  Already trained {checkpoint['epoch']} epoch(s). "
+              f"Increase EPOCHS to train further.")
+        return
 
     # ------------------------------------------------------------------
     # Training loop
     # ------------------------------------------------------------------
-    best_val_loss = float("inf")
-    log_lines     = ["epoch,train_loss,val_loss,time_s\n"]
+    print(f"\n  Starting training for {remaining_epochs} more epoch(s) "
+          f"(epoch {start_epoch} → {start_epoch + remaining_epochs - 1})...\n")
 
-    print(f"  Starting training for {EPOCHS} epochs...\n")
-
-    for epoch in range(1, EPOCHS + 1):
+    for epoch in range(start_epoch, start_epoch + remaining_epochs):
         epoch_start = time.time()
 
         train_loss = train_epoch(
@@ -221,7 +245,7 @@ def main() -> None:
 
         epoch_time = time.time() - epoch_start
 
-        print(f"\n  Epoch {epoch}/{EPOCHS} complete")
+        print(f"\n  Epoch {epoch} complete")
         print(f"  Train loss : {train_loss:.4f}")
         print(f"  Val loss   : {val_loss:.4f}")
         print(f"  Time       : {epoch_time:.1f}s\n")
