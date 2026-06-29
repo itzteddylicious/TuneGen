@@ -44,8 +44,8 @@ DATA_DIR         = Path("data")
 CHECKPOINT_DIR   = Path("checkpoints")
 
 BATCH_SIZE       = 512
-EPOCHS           = 5
-LEARNING_RATE    = 0.001
+EPOCHS           = 7
+LEARNING_RATE    = 0.0001
 GRAD_CLIP        = 1.0        # gradient clipping to prevent exploding gradients
 SAMPLE_RATIO     = 0.20       # fraction of training data to use
 
