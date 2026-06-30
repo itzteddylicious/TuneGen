@@ -1,14 +1,16 @@
 """
-train.py — TuneGen LSTM Training Loop
-=======================================
+train.py — TuneGen Transformer Training Loop
+===============================================
 Trains the TuneGenTransformer model on preprocessed GiantMIDI data.
 
 What this script does
 ---------------------
 - Loads train and validation splits from data/
-- Trains the LSTM with cross-entropy loss
+- Trains the Transformer with cross-entropy loss using causal self-attention
 - Validates after every epoch
 - Saves the best model checkpoint based on validation loss
+- Supports resuming from a saved checkpoint
+- Stops early if validation loss does not improve for a set number of epochs
 - Logs training progress to checkpoints/training_log.txt
 
 Run
@@ -17,7 +19,7 @@ Run
 
 Output
 ------
-    checkpoints/best_model.pt       — best model weights
+    checkpoints/best_model.pt       — best model weights (saved on improvement)
     checkpoints/training_log.txt    — epoch-by-epoch loss log
 
 Dependencies
@@ -44,10 +46,11 @@ DATA_DIR         = Path("data")
 CHECKPOINT_DIR   = Path("checkpoints")
 
 BATCH_SIZE       = 512
-EPOCHS           = 7
+EPOCHS           = 30
 LEARNING_RATE    = 0.0001
 GRAD_CLIP        = 1.0        # gradient clipping to prevent exploding gradients
 SAMPLE_RATIO     = 0.20       # fraction of training data to use
+EARLY_STOPPING_PATIENCE = 2   # stop if val loss doesn't improve for this many epochs
 
 
 # ---------------------------------------------------------------------------
@@ -229,6 +232,8 @@ def main() -> None:
               f"Increase EPOCHS to train further.")
         return
 
+    epochs_without_improvement = 0
+
     # ------------------------------------------------------------------
     # Training loop
     # ------------------------------------------------------------------
@@ -255,6 +260,7 @@ def main() -> None:
         # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+            epochs_without_improvement = 0
             torch.save(
                 {
                     "epoch":      epoch,
@@ -265,6 +271,15 @@ def main() -> None:
                 CHECKPOINT_DIR / "best_model.pt",
             )
             print(f"  Checkpoint saved (val loss: {val_loss:.4f})\n")
+        else:
+            epochs_without_improvement += 1
+            print(f"  No improvement ({epochs_without_improvement}/{EARLY_STOPPING_PATIENCE})\n")
+
+            if epochs_without_improvement >= EARLY_STOPPING_PATIENCE:
+                print(f"  Early stopping triggered — val loss did not improve "
+                      f"for {EARLY_STOPPING_PATIENCE} consecutive epochs.")
+                print(f"  Best model (val loss: {best_val_loss:.4f}) is already saved.\n")
+                break
 
     # ------------------------------------------------------------------
     # Save log

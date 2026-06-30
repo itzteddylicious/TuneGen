@@ -1,7 +1,7 @@
 """
 predict.py — TuneGen Inference
 ================================
-Loads the trained LSTM model and predicts the next notes
+Loads the trained Transformer model and predicts the next notes
 given an input sequence of note names.
 
 Usage

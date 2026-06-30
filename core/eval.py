@@ -1,7 +1,7 @@
 """
 eval.py — TuneGen Model Evaluation
 =====================================
-Evaluates the trained LSTM model on the held-out test set.
+Evaluates the trained Transformer model on the held-out test set.
 
 Metrics
 -------
