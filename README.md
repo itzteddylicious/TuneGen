@@ -21,12 +21,14 @@ You decide which direction to follow. TuneGen continues from there.
 
 ```
 TuneGen/
-  core/       — ML-based system (current development)
+  core/       — Transformer-based ML system (current development)
   legacy/     — Rule-based prototype (reference implementation)
 ```
 
 ### core
-The main system. Built on an LSTM model trained on the GiantMIDI-Piano dataset — 10,841 classical piano performances by 2,786 composers. The model learns harmonic and melodic patterns from real human performances rather than predefined rules.
+The main system. Built on a Transformer decoder architecture trained on the GiantMIDI-Piano dataset — 10,841 classical piano performances by 2,786 composers. The model learns harmonic and melodic patterns from real human performances rather than predefined rules.
+
+**Current model:** 1.22M parameter Transformer (6 layers, 8 attention heads, 128 embedding dim)
 
 ### legacy
 The original rule-based prototype. Operates within the C Major scale and uses deterministic musical rules to generate three continuations — SAFE, CREATIVE, and UNEXPECTED. Kept as a reference implementation and proof of concept.
@@ -49,7 +51,7 @@ core/giantmidi/
 
 ## Status
 
-The project is in active development. The core ML model is functional and producing musically meaningful suggestions. Further training, evaluation, and refinement are ongoing.
+The project is in active development. The Transformer model is currently in training and producing musically meaningful suggestions. Further training, evaluation, and refinement are ongoing.
 
 ---
 

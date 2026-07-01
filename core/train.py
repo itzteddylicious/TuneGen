@@ -257,6 +257,10 @@ def main() -> None:
 
         log_lines.append(f"{epoch},{train_loss:.4f},{val_loss:.4f},{epoch_time:.1f}\n")
 
+        # Write log after every epoch so it's always up to date
+        with open(CHECKPOINT_DIR / "training_log.txt", "w") as f:
+            f.writelines(log_lines)
+
         # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -281,15 +285,8 @@ def main() -> None:
                 print(f"  Best model (val loss: {best_val_loss:.4f}) is already saved.\n")
                 break
 
-    # ------------------------------------------------------------------
-    # Save log
-    # ------------------------------------------------------------------
-    log_path = CHECKPOINT_DIR / "training_log.txt"
-    with open(log_path, "w") as f:
-        f.writelines(log_lines)
-
     print(f"  Training complete. Best val loss: {best_val_loss:.4f}")
-    print(f"  Log saved to {log_path}\n")
+    print(f"  Log saved to {CHECKPOINT_DIR / 'training_log.txt'}\n")
 
 
 if __name__ == "__main__":
